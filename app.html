@@ -163,6 +163,11 @@ body::after {
     flex-shrink: 0;
 }
 
+.ms-digit-group {
+    width: 22rem;          /* 6자리 숫자용 너비 */
+    margin-left: 0.5rem;
+}
+
 .digit-value {
     font-size: 4.5rem;
     font-weight: 900;
@@ -352,11 +357,41 @@ footer {
     opacity: 0.6;
 }
 
+@media (max-width: 900px) {
+    .digit-value { font-size: 3.5rem; height: 1.2em; }
+    .digit-group { width: 7rem; }
+    .ms-digit-group { width: 17rem; }
+    .sep { font-size: 2.8rem; }
+    .countdown-card { padding: 2.5rem 1.5rem; }
+}
+
 @media (max-width: 600px) {
+    .countdown-card { padding: 2rem 1rem; border-radius: 1.5rem; }
+    
+    /* 모바일에서는 레이아웃을 감싸도록 설정 (시:분:초 / ms 분리) */
+    .digits-row { 
+        flex-wrap: wrap; 
+        justify-content: center; 
+        row-gap: 1.5rem; 
+    }
+    
     .digit-value { font-size: 2.8rem; }
-    .sep         { font-size: 2.2rem; }
-    .arc-wrapper { width: 200px; height: 200px; }
-    .arc-percent { font-size: 2.2rem; }
+    .digit-group { width: 5.5rem; }
+    .sep { font-size: 2.2rem; }
+    
+    /* 밀리초 부분을 아래 줄로 내림 */
+    .sep-dot { display: none; }
+    .ms-digit-group { 
+        width: 100%; 
+        margin-left: 0; 
+        margin-top: 0.5rem;
+    }
+    
+    /* 모바일에서 ms 글자는 조금 더 크게 유지 */
+    .ms-digit-group .digit-value { font-size: 3.2rem; }
+
+    .arc-wrapper { width: 220px; height: 220px; margin-bottom: 2rem; }
+    .arc-percent { font-size: clamp(1rem, 6vw, 2.2rem); }
 }
     </style>
 </head>
@@ -414,8 +449,8 @@ footer {
                         <div class="digit-value normal" id="dv-s"><span class="digit-inner" id="seconds">00</span></div>
                         <div class="digit-label">SEC</div>
                     </div>
-                    <div class="sep" style="font-size:2rem;padding-bottom:1.7rem;opacity:0.5">.</div>
-                    <div class="digit-group" style="width: 22rem; margin-left:0.5rem;">
+                    <div class="sep sep-dot" style="font-size:2rem;padding-bottom:1.7rem;opacity:0.5">.</div>
+                    <div class="digit-group ms-digit-group">
                         <div class="digit-value accent" id="dv-ms"><span class="digit-inner" id="milliseconds">000000</span></div>
                         <div class="digit-label">MICROSEC</div>
                     </div>
