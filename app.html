@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Countdown 18:00</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+:root {
+    --bg: #030308;
+    --accent: #7c4dff;
+    --cyan: #00e5ff;
+    --red: #ff3d5a;
+    --gold: #ffd600;
+    --font: 'Orbitron', monospace;
+    --font2: 'Outfit', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: var(--bg);
+    color: #fff;
+    font-family: var(--font);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+}
+
+/* ── Canvas for speed lines + particles ── */
+#bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* ── Radial vignette ── */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(3,3,8,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.container {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    width: 100%;
+    max-width: 1200px;
+    padding: 1.5rem;
+}
+
+/* ── Header ── */
+.header-label {
+    font-family: var(--font2);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.6rem;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+}
+
+.header-target {
+    font-family: var(--font2);
+    font-size: 1rem;
+    font-weight: 300;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 2.5rem;
+}
+
+.header-target span {
+    color: var(--cyan);
+    font-weight: 600;
+}
+
+/* ── Progress arc ── */
+.arc-wrapper {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    margin: 0 auto 2.5rem;
+}
+
+#arc-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.arc-bg {
+    fill: none;
+    stroke: rgba(255,255,255,0.05);
+    stroke-width: 6;
+}
+
+#arc-fill {
+    fill: none;
+    stroke: url(#arcGrad);
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.5s linear, stroke 0.5s ease;
+    filter: drop-shadow(0 0 8px rgba(124,77,255,0.8));
+}
+
+/* Arc inner content */
+.arc-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.arc-percent {
+    font-size: clamp(1.2rem, 4vw, 1.9rem); /* 소수점 포함 7~9자 맞게 축소 */
+    font-weight: 900;
+    background: linear-gradient(135deg, #fff 30%, var(--cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.05em;
+    line-height: 1;
+    white-space: nowrap;
+    max-width: 80%; /* 원 안을 넘지 않도록 */
+    overflow: hidden;
+}
+
+.arc-label {
+    font-family: var(--font2);
+    font-size: 0.65rem;
+    letter-spacing: 0.25rem;
+    color: rgba(255,255,255,0.4);
+}
+
+/* ── Main digit display ── */
+.digits-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 1.5rem;
+}
+
+.digit-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 9rem;           /* 2자리 숫자용 충분한 고정 너비 */
+    flex-shrink: 0;
+}
+
+.digit-value {
+    font-size: 4.5rem;
+    font-weight: 900;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    position: relative;
+    overflow: hidden;
+    /* Clipping container */
+    height: 1.2em;         /* 상하 잘림 방지를 위해 약간 늘림 */
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center; /* 가운데 정렬로 좌우 이동 방지 */
+}
+
+.digit-inner {
+    display: inline-block;
+    will-change: transform, opacity;
+}
+
+.digit-label {
+    font-family: var(--font2);
+    font-size: 0.55rem;
+    letter-spacing: 0.25rem;
+    color: rgba(255,255,255,0.3);
+    margin-top: 0.4rem;
+}
+
+/* Glowing text depending on urgency */
+.digit-value.normal .digit-inner {
+    background: linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.6) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 6px rgba(124,77,255,0.4));
+}
+.digit-value.warn .digit-inner {
+    background: linear-gradient(180deg, #ffd600, #ff9800);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 8px rgba(255,180,0,0.7));
+}
+.digit-value.danger .digit-inner {
+    background: linear-gradient(180deg, #ff6b6b, #ff3d5a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 12px rgba(255,61,90,0.8));
+}
+
+/* Separators */
+.sep {
+    font-size: 3.5rem;
+    font-weight: 900;
+    color: rgba(255,255,255,0.15);
+    padding-bottom: 1.5rem;
+    user-select: none;
+}
+
+/* ── Accent modifier for ms block ── */
+.digit-value.accent .digit-inner {
+    background: linear-gradient(180deg, #b57bff, var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 8px rgba(124,77,255,0.7));
+}
+
+/* ── Progress bar ── */
+.progress-bar-wrap {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+    position: relative;
+}
+
+.progress-bar-track {
+    height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+#progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    box-shadow: 0 0 10px rgba(0,229,255,0.5);
+    transition: width 0.5s linear;
+    position: relative;
+}
+
+#progress-fill::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 10px var(--cyan);
+}
+
+/* ── Urgency pulse overlay ── */
+#urgency-flash {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(255,61,90,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+/* ── Completed state ── */
+#status-message {
+    font-size: 2.5rem;
+    font-weight: 900;
+    letter-spacing: 0.4rem;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: blastIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes blastIn {
+    0% { opacity: 0; transform: scale(0.5); filter: blur(20px); }
+    100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+.hidden { display: none !important; }
+
+/* ── Footer ── */
+footer {
+    font-family: var(--font2);
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.2);
+    letter-spacing: 0.15rem;
+    margin-top: 1.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+/* ── Flip animation ── */
+@keyframes flipUp {
+    0%   { transform: translateY(100%); opacity: 0; }
+    100% { transform: translateY(0);    opacity: 1; }
+}
+@keyframes flipOut {
+    0%   { transform: translateY(0);    opacity: 1; }
+    100% { transform: translateY(-100%); opacity: 0; }
+}
+
+.flip-in  .digit-inner { animation: flipUp   0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+.flip-out .digit-inner { animation: flipOut  0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+
+/* Danger pulse on the card */
+@keyframes dangerPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,61,90,0); }
+    50%      { box-shadow: 0 0 40px 10px rgba(255,61,90,0.3); }
+}
+
+.countdown-card {
+    background: rgba(255,255,255,0.02);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 2rem;
+    padding: 3rem 2rem 2.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.5s ease;
+}
+
+.countdown-card.danger {
+    border-color: rgba(255,61,90,0.3);
+    animation: dangerPulse 1s ease-in-out infinite;
+}
+
+/* Card top accent line */
+.countdown-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--cyan), transparent);
+    opacity: 0.6;
+}
+
+@media (max-width: 600px) {
+    .digit-value { font-size: 2.8rem; }
+    .sep         { font-size: 2.2rem; }
+    .arc-wrapper { width: 200px; height: 200px; }
+    .arc-percent { font-size: 2.2rem; }
+}
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+    <div id="urgency-flash"></div>
+
+    <main class="container">
+        <div class="header-label">Daily Mission</div>
+        <p class="header-target">Target: <span>18:00:00.000</span></p>
+
+        <!-- Arc progress ring -->
+        <div class="arc-wrapper">
+            <svg id="arc-svg" viewBox="0 0 100 100">
+                <defs>
+                    <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%"   stop-color="#7c4dff"/>
+                        <stop offset="100%" stop-color="#00e5ff"/>
+                    </linearGradient>
+                    <linearGradient id="arcWarn" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%"   stop-color="#ff9800"/>
+                        <stop offset="100%" stop-color="#ffd600"/>
+                    </linearGradient>
+                    <linearGradient id="arcDanger" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%"   stop-color="#ff3d5a"/>
+                        <stop offset="100%" stop-color="#ff6b6b"/>
+                    </linearGradient>
+                </defs>
+                <circle class="arc-bg" cx="50" cy="50" r="44"/>
+                <circle id="arc-fill" cx="50" cy="50" r="44"
+                    stroke-dasharray="276.46"
+                    stroke-dashoffset="276.46"/>
+            </svg>
+            <div class="arc-inner">
+                <div class="arc-percent" id="arc-percent">0%</div>
+                <div class="arc-label">COMPLETED</div>
+            </div>
+        </div>
+
+        <!-- Main countdown card -->
+        <section class="countdown-card" id="countdown-card">
+            <div id="countdown-display">
+                <div class="digits-row">
+                    <div class="digit-group">
+                        <div class="digit-value normal" id="dv-h"><span class="digit-inner" id="hours">00</span></div>
+                        <div class="digit-label">HOURS</div>
+                    </div>
+                    <div class="sep">:</div>
+                    <div class="digit-group">
+                        <div class="digit-value normal" id="dv-m"><span class="digit-inner" id="minutes">00</span></div>
+                        <div class="digit-label">MIN</div>
+                    </div>
+                    <div class="sep">:</div>
+                    <div class="digit-group">
+                        <div class="digit-value normal" id="dv-s"><span class="digit-inner" id="seconds">00</span></div>
+                        <div class="digit-label">SEC</div>
+                    </div>
+                    <div class="sep" style="font-size:2rem;padding-bottom:1.7rem;opacity:0.5">.</div>
+                    <div class="digit-group" style="width: 22rem; margin-left:0.5rem;">
+                        <div class="digit-value accent" id="dv-ms"><span class="digit-inner" id="milliseconds">000000</span></div>
+                        <div class="digit-label">MICROSEC</div>
+                    </div>
+                </div>
+
+                <!-- Linear progress -->
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar-track">
+                        <div id="progress-fill" style="width:0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="status-message" class="hidden">
+                🎯 MISSION COMPLETED
+            </div>
+        </section>
+
+        <footer>Resets daily · 00:00 → 18:00</footer>
+    </main>
+
+    <script>
+// ── High-resolution time base ──
+const startTime  = Date.now();
+const perfStart  = performance.now();
+const TARGET_H   = 18;          // target hour
+const DAY_TOTAL  = TARGET_H * 3600000; // ms in a day until 18:00 from midnight
+
+// ── Previous values for flip detection ──
+let prevH = -1, prevM = -1, prevS = -1;
+
+// ── DOM refs ──
+const displayEl  = document.getElementById('countdown-display');
+const statusEl   = document.getElementById('status-message');
+const hoursEl    = document.getElementById('hours');
+const minutesEl  = document.getElementById('minutes');
+const secondsEl  = document.getElementById('seconds');
+const msEl       = document.getElementById('milliseconds');
+const arcFill    = document.getElementById('arc-fill');
+const arcPct     = document.getElementById('arc-percent');
+const progFill   = document.getElementById('progress-fill');
+const card       = document.getElementById('countdown-card');
+const urgFlash   = document.getElementById('urgency-flash');
+const dvH = document.getElementById('dv-h');
+const dvM = document.getElementById('dv-m');
+const dvS = document.getElementById('dv-s');
+const dvMs = document.getElementById('dv-ms');
+
+const ARC_CIRC   = 276.46;
+
+function setFlip(dvEl, el, newVal) {
+    dvEl.classList.add('flip-out');
+    setTimeout(() => {
+        el.textContent = newVal;
+        dvEl.classList.remove('flip-out');
+        dvEl.classList.add('flip-in');
+        setTimeout(() => dvEl.classList.remove('flip-in'), 160);
+    }, 140);
+}
+
+function setUrgency(hoursLeft, secondsLeft) {
+    const danger = hoursLeft === 0 && secondsLeft <= 60;
+    const warn   = hoursLeft === 0 && secondsLeft <= 600 && !danger;
+
+    [dvH, dvM, dvS].forEach(el => {
+        el.className = 'digit-value ' + (danger ? 'danger' : warn ? 'warn' : 'normal');
+    });
+    // ms는 accent 클래스 유지
+    dvMs.className = 'digit-value accent';
+
+    if (danger) {
+        card.classList.add('danger');
+        urgFlash.style.opacity = (Math.sin(Date.now() / 250) * 0.5 + 0.5).toFixed(3);
+    } else {
+        card.classList.remove('danger');
+        urgFlash.style.opacity = '0';
+    }
+}
+
+function updateCountdown() {
+    const now     = new Date(startTime + (performance.now() - perfStart));
+    const target  = new Date(now);
+    target.setHours(TARGET_H, 0, 0, 0);
+    const diff    = target.getTime() - (startTime + (performance.now() - perfStart));
+
+    if (diff <= 0) {
+        displayEl.classList.add('hidden');
+        statusEl.classList.remove('hidden');
+        card.classList.remove('danger');
+        urgFlash.style.opacity = '0';
+        arcFill.setAttribute('stroke-dashoffset', '0');
+        arcPct.textContent = '100%';
+        progFill.style.width = '100%';
+        requestAnimationFrame(updateCountdown);
+        return;
+    }
+
+    displayEl.classList.remove('hidden');
+    statusEl.classList.add('hidden');
+
+    const h  = Math.floor(diff / 3_600_000);
+    const m  = Math.floor((diff % 3_600_000) / 60_000);
+    const s  = Math.floor((diff % 60_000) / 1000);
+    const micro = Math.floor((diff % 1000) * 1000);
+
+    // Flip animation for changed digits
+    const hs = String(h).padStart(2, '0');
+    const ms_ = String(m).padStart(2, '0');
+    const ss = String(s).padStart(2, '0');
+
+    if (h !== prevH)  { setFlip(dvH, hoursEl,   hs);  prevH = h; }
+    if (m !== prevM)  { setFlip(dvM, minutesEl,  ms_); prevM = m; }
+    if (s !== prevS)  { setFlip(dvS, secondsEl,  ss);  prevS = s; }
+
+    msEl.textContent = String(micro).padStart(6, '0');
+
+    // Progress: how far through today 00:00→18:00
+    // elapsed from midnight
+    const midnight = new Date(now); midnight.setHours(0,0,0,0);
+    const elapsed  = now.getTime() - midnight.getTime();
+    const pct      = Math.min(elapsed / DAY_TOTAL, 1);
+    const pctDisplay = (pct * 100).toFixed(4);
+
+    // Arc
+    const totalSecondsLeft = diff / 1000;
+    arcFill.setAttribute('stroke-dashoffset', (ARC_CIRC * (1 - pct)).toFixed(4));
+    arcFill.setAttribute('stroke', pct > 0.9 ? 'url(#arcDanger)' : pct > 0.75 ? 'url(#arcWarn)' : 'url(#arcGrad)');
+    arcPct.textContent = pctDisplay + '%';
+
+    // Linear bar
+    progFill.style.width = (pct * 100).toFixed(6) + '%';
+
+    // Danger/warn color
+    setUrgency(h, totalSecondsLeft);
+
+    requestAnimationFrame(updateCountdown);
+}
+
+// ── Speed lines + particles canvas ──
+(function initCanvas() {
+    const canvas = document.getElementById('bg-canvas');
+    const ctx    = canvas.getContext('2d');
+    let W, H;
+
+    function resize() {
+        W = canvas.width  = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Speed lines
+    const LINES = Array.from({ length: 60 }, () => ({
+        x: Math.random() * 1,      // 0-1 normalized
+        y: Math.random() * 1,
+        speed: 0.0003 + Math.random() * 0.0015,
+        len: 0.04 + Math.random() * 0.12,
+        alpha: 0.05 + Math.random() * 0.15,
+        color: Math.random() > 0.5 ? '124,77,255' : '0,229,255',
+    }));
+
+    // Particles
+    const PARTS = Array.from({ length: 40 }, () => ({
+        x: Math.random(),
+        y: Math.random(),
+        r: 0.5 + Math.random() * 2,
+        vx: (Math.random() - 0.5) * 0.0002,
+        vy: -0.0001 - Math.random() * 0.0003,
+        alpha: 0.1 + Math.random() * 0.3,
+        color: Math.random() > 0.5 ? '124,77,255' : '0,229,255',
+    }));
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Speed lines moving from center to edges
+        LINES.forEach(l => {
+            l.x += l.speed;
+            if (l.x > 1) { l.x = 0; l.y = Math.random(); }
+
+            const x  = l.x * W;
+            const y  = l.y * H;
+            const lx = l.len * W;
+
+            const grad = ctx.createLinearGradient(x - lx, y, x, y);
+            grad.addColorStop(0, `rgba(${l.color},0)`);
+            grad.addColorStop(1, `rgba(${l.color},${l.alpha})`);
+
+            ctx.beginPath();
+            ctx.moveTo(x - lx, y);
+            ctx.lineTo(x, y);
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+        });
+
+        // Floating particles
+        PARTS.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            if (p.y < -0.01) { p.y = 1.01; p.x = Math.random(); }
+            if (p.x < -0.01 || p.x > 1.01) { p.x = Math.random(); p.y = Math.random(); }
+
+            ctx.beginPath();
+            ctx.arc(p.x * W, p.y * H, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.color},${p.alpha})`;
+            ctx.fill();
+        });
+
+        requestAnimationFrame(draw);
+    }
+    draw();
+})();
+
+// ── Start countdown ──
+requestAnimationFrame(updateCountdown);
+    </script>
+</body>
+</html>
