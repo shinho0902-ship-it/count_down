@@ -34,13 +34,17 @@ body {
 }
 
 /* ── Canvas for speed lines + particles ── */
-#bg-canvas {
+#bg-canvas, #celebration-canvas {
     position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
     z-index: 0;
     pointer-events: none;
+}
+
+#celebration-canvas {
+    z-index: 10; /* 글자 위에서 터지도록 */
 }
 
 /* ── Radial vignette ── */
@@ -290,7 +294,50 @@ body::after {
     background: linear-gradient(90deg, var(--accent), var(--cyan));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: blastIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    position: relative;
+}
+
+#status-message.celebrate {
+    animation: blastIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, glitch-shake 0.3s infinite;
+}
+
+#status-message::before, #status-message::after {
+    content: "🎯 MISSION COMPLETED";
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: -1;
+    opacity: 0.8;
+}
+
+#status-message.celebrate::before {
+    color: #ff00ff;
+    animation: glitch-offset 0.2s infinite;
+    -webkit-text-fill-color: #ff00ff;
+}
+
+#status-message.celebrate::after {
+    color: #00ffff;
+    animation: glitch-offset 0.3s infinite reverse;
+    -webkit-text-fill-color: #00ffff;
+}
+
+@keyframes glitch-shake {
+    0% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+    100% { transform: translate(0); }
+}
+
+@keyframes glitch-offset {
+    0% { transform: translate(0); clip-path: inset(10% 0 30% 0); }
+    20% { transform: translate(3px, -3px); clip-path: inset(40% 0 10% 0); }
+    40% { transform: translate(-3px, 3px); clip-path: inset(70% 0 5% 0); }
+    60% { transform: translate(2px, 2px); clip-path: inset(20% 0 60% 0); }
+    80% { transform: translate(-2px, -2px); clip-path: inset(50% 0 20% 0); }
+    100% { transform: translate(0); clip-path: inset(80% 0 10% 0); }
 }
 
 @keyframes blastIn {
@@ -397,6 +444,7 @@ footer {
 </head>
 <body>
     <canvas id="bg-canvas"></canvas>
+    <canvas id="celebration-canvas"></canvas>
     <div id="urgency-flash"></div>
 
     <main class="container">
@@ -499,6 +547,7 @@ const dvM = document.getElementById('dv-m');
 const dvS = document.getElementById('dv-s');
 const dvMs = document.getElementById('dv-ms');
 
+let confettiLaunched = false;
 const ARC_CIRC   = 276.46;
 
 function setFlip(dvEl, el, newVal) {
@@ -539,11 +588,19 @@ function updateCountdown() {
     if (diff <= 0) {
         displayEl.classList.add('hidden');
         statusEl.classList.remove('hidden');
+        statusEl.classList.add('celebrate'); // 글리치 클래스 추가
         card.classList.remove('danger');
         urgFlash.style.opacity = '0';
         arcFill.setAttribute('stroke-dashoffset', '0');
         arcPct.textContent = '100%';
         progFill.style.width = '100%';
+        
+        if (!confettiLaunched) {
+            launchConfetti();
+            setInterval(launchConfetti, 1000); // 1초마다 반복 실행
+            confettiLaunched = true;
+        }
+        
         requestAnimationFrame(updateCountdown);
         return;
     }
@@ -625,6 +682,7 @@ function updateCountdown() {
 
     function draw() {
         ctx.clearRect(0, 0, W, H);
+        const time = Date.now() * 0.002;
 
         // Speed lines moving from center to edges
         LINES.forEach(l => {
@@ -635,9 +693,23 @@ function updateCountdown() {
             const y  = l.y * H;
             const lx = l.len * W;
 
+            let color = l.color;
+            if (confettiLaunched) {
+                // Neon Party Mode: Cycle through HSL
+                const hue = (l.x * 100 + time * 50) % 360;
+                color = `hsl(${hue}, 100%, 60%)`;
+            } else {
+                color = `rgba(${l.color},`;
+            }
+
             const grad = ctx.createLinearGradient(x - lx, y, x, y);
-            grad.addColorStop(0, `rgba(${l.color},0)`);
-            grad.addColorStop(1, `rgba(${l.color},${l.alpha})`);
+            if (confettiLaunched) {
+                grad.addColorStop(0, `hsla(${(parseFloat(color.match(/\d+/)[0]) + 180) % 360}, 100%, 60%, 0)`);
+                grad.addColorStop(1, color);
+            } else {
+                grad.addColorStop(0, `${color}0)`);
+                grad.addColorStop(1, `${color}${l.alpha})`);
+            }
 
             ctx.beginPath();
             ctx.moveTo(x - lx, y);
@@ -654,9 +726,17 @@ function updateCountdown() {
             if (p.y < -0.01) { p.y = 1.01; p.x = Math.random(); }
             if (p.x < -0.01 || p.x > 1.01) { p.x = Math.random(); p.y = Math.random(); }
 
+            let color;
+            if (confettiLaunched) {
+                const hue = (p.x * 360 + time * 100) % 360;
+                color = `hsla(${hue}, 100%, 60%, ${p.alpha})`;
+            } else {
+                color = `rgba(${p.color},${p.alpha})`;
+            }
+
             ctx.beginPath();
             ctx.arc(p.x * W, p.y * H, p.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(${p.color},${p.alpha})`;
+            ctx.fillStyle = color;
             ctx.fill();
         });
 
@@ -664,6 +744,71 @@ function updateCountdown() {
     }
     draw();
 })();
+
+// ── Confetti System ──
+const confettiCanvas = document.getElementById('celebration-canvas');
+const cfx = confettiCanvas.getContext('2d');
+let particles = [];
+
+function resizeConfetti() {
+    confettiCanvas.width = window.innerWidth;
+    confettiCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeConfetti);
+resizeConfetti();
+
+class Particle {
+    constructor() {
+        this.x = window.innerWidth / 2;
+        this.y = window.innerHeight / 2 + 100;
+        this.color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+        this.size = Math.random() * 8 + 4;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 15 + 10;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed - 10; // Upward burst
+        this.gravity = 0.2;
+        this.friction = 0.98;
+        this.rotation = Math.random() * 360;
+        this.rotationSpeed = (Math.random() - 0.5) * 10;
+        this.opacity = 1;
+    }
+    update() {
+        this.vx *= this.friction;
+        this.vy *= this.friction;
+        this.vy += this.gravity;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.rotation += this.rotationSpeed;
+        this.opacity -= 0.005;
+    }
+    draw() {
+        cfx.save();
+        cfx.translate(this.x, this.y);
+        cfx.rotate((this.rotation * Math.PI) / 180);
+        cfx.globalAlpha = this.opacity;
+        cfx.fillStyle = this.color;
+        cfx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+        cfx.restore();
+    }
+}
+
+function launchConfetti() {
+    for (let i = 0; i < 200; i++) {
+        particles.push(new Particle());
+    }
+}
+
+function updateParticles() {
+    cfx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    particles = particles.filter(p => p.opacity > 0);
+    particles.forEach(p => {
+        p.update();
+        p.draw();
+    });
+    requestAnimationFrame(updateParticles);
+}
+updateParticles();
 
 // ── Start countdown ──
 requestAnimationFrame(updateCountdown);
